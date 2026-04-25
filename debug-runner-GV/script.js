@@ -230,7 +230,10 @@ function project(lane, z) {
 const held = new Set();
 
 document.addEventListener("keydown", (e) => {
-  if (["Space", "ArrowLeft", "ArrowRight", "ArrowUp"].includes(e.code))
+  // Never block keyboard shortcuts while focus is on an editable element
+  const tag = document.activeElement && document.activeElement.tagName;
+  const isEditing = tag === "INPUT" || tag === "TEXTAREA";
+  if (!isEditing && ["Space", "ArrowLeft", "ArrowRight", "ArrowUp"].includes(e.code))
     e.preventDefault();
   if (held.has(e.code)) return;
   held.add(e.code);
