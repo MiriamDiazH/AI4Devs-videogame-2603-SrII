@@ -30,9 +30,19 @@
   const SOFT_DROP_INTERVAL = 40;
   const LOCK_DELAY = 350;
   const PROCESS_STEP_DELAY = 150;
-  const AI_MOVE_INTERVAL = 120;
+  // AI difficulty tiers: [moveInterval, randomness, mistakeChance, adjacencyWeight, crashWeight]
+  // moveInterval = ms between AI actions (higher = slower)
+  // randomness   = added random noise to placement scores
+  // mistakeChance = probability AI ignores best move and picks randomly
+  // adjacencyWeight / crashWeight = heuristic multipliers
+  const AI_DIFFICULTY = [
+    { moveInterval: 400, randomness: 25, mistakeChance: 0.25, adjWeight: 2, crashWeight: 5 },  // Easy (default)
+    { moveInterval: 300, randomness: 15, mistakeChance: 0.15, adjWeight: 4, crashWeight: 10 }, // After 1 win streak
+    { moveInterval: 200, randomness: 8,  mistakeChance: 0.08, adjWeight: 5, crashWeight: 13 }, // After 2 win streak
+    { moveInterval: 130, randomness: 4,  mistakeChance: 0.02, adjWeight: 5, crashWeight: 15 }, // After 3+ win streak
+  ];
   const COUNTER_TIMER_MAX = 8;
-  const CRASH_GEM_CHANCE = 0.14;
+  const CRASH_GEM_CHANCE = 0.30;
   const RAINBOW_INTERVAL = 25;
 
   // ===========================
@@ -560,6 +570,7 @@
       this.aiTarget = null;
       this.aiMoveTimer = 0;
       this.aiDecided = false;
+      this.aiDifficulty = 0; // index into AI_DIFFICULTY
     }
 
     reset() {
@@ -776,14 +787,24 @@
     }
 
     // ---- AI ----
+    getAIDifficulty() {
+      return AI_DIFFICULTY[Math.min(this.aiDifficulty, AI_DIFFICULTY.length - 1)];
+    }
+
     updateAI(dt) {
       if (!this.pair) return;
+      const diff = this.getAIDifficulty();
       this.aiMoveTimer += dt;
-      if (this.aiMoveTimer < AI_MOVE_INTERVAL) return;
+      if (this.aiMoveTimer < diff.moveInterval) return;
       this.aiMoveTimer = 0;
 
       if (!this.aiDecided) {
-        this.aiTarget = this.computeAITarget();
+        // Chance of making a mistake (random placement)
+        if (Math.random() < diff.mistakeChance) {
+          this.aiTarget = { targetX: randInt(COLS), targetOri: randInt(4) };
+        } else {
+          this.aiTarget = this.computeAITarget();
+        }
         this.aiDecided = true;
       }
 
@@ -884,16 +905,17 @@
       if (h2 > 8) score -= 20;
 
       // Adjacency bonus — prefer placing next to same color
+      const diff = this.getAIDifficulty();
       const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
       const landY1 = ROWS - 1 - h1;
       const landY2 = ROWS - 1 - h2;
 
       for (const [dx, dy] of dirs) {
         const nc1 = board.cell(x + dx, landY1 + dy);
-        if (nc1 && nc1.color === c1 && nc1.type === NORMAL) score += 5;
+        if (nc1 && nc1.color === c1 && nc1.type === NORMAL) score += diff.adjWeight;
         if (sx !== x || ori === 0 || ori === 2) {
           const nc2 = board.cell(sx + dx, landY2 + dy);
-          if (nc2 && nc2.color === c2 && nc2.type === NORMAL) score += 5;
+          if (nc2 && nc2.color === c2 && nc2.type === NORMAL) score += diff.adjWeight;
         }
       }
 
@@ -904,18 +926,18 @@
       if (pair.gem1.type === CRASH) {
         for (const [dx, dy] of dirs) {
           const nc = board.cell(x + dx, landY1 + dy);
-          if (nc && nc.color === c1 && nc.type === NORMAL) score += 15;
+          if (nc && nc.color === c1 && nc.type === NORMAL) score += diff.crashWeight;
         }
       }
       if (pair.gem2.type === CRASH) {
         for (const [dx, dy] of dirs) {
           const nc = board.cell(sx + dx, landY2 + dy);
-          if (nc && nc.color === c2 && nc.type === NORMAL) score += 15;
+          if (nc && nc.color === c2 && nc.type === NORMAL) score += diff.crashWeight;
         }
       }
 
-      // Slight randomness for variety
-      score += Math.random() * 4;
+      // Randomness inversely proportional to difficulty
+      score += Math.random() * diff.randomness;
 
       return score;
     }
@@ -1220,6 +1242,10 @@
         ? `⚠ ${game.player1.pendingCounter} incoming` : '';
       cw2.textContent = game.player2.pendingCounter > 0
         ? `⚠ ${game.player2.pendingCounter} incoming` : '';
+
+      // Difficulty label
+      const diffEl = document.getElementById('ai-difficulty');
+      if (diffEl) diffEl.textContent = game.getDifficultyLabel();
     }
   }
 
@@ -1238,6 +1264,7 @@
       this.lastTime = 0;
       this.gameOverTimer = 0;
       this.roundOver = false;
+      this.p1WinStreak = 0;
     }
 
     start() {
@@ -1249,6 +1276,8 @@
       this.paused = false;
       this.roundOver = false;
       this.gameOverTimer = 0;
+      this.p1WinStreak = 0;
+      this.player2.aiDifficulty = 0;
       this.player1.spawn();
       this.player2.spawn();
 
@@ -1291,9 +1320,13 @@
           this.gameOverTimer = 0;
           if (this.player1.state === 'gameover' && this.player2.state !== 'gameover') {
             this.player2.wins++;
+            this.p1WinStreak = 0; // Player lost, reset streak
           } else if (this.player2.state === 'gameover' && this.player1.state !== 'gameover') {
             this.player1.wins++;
+            this.p1WinStreak++;
           }
+          // Adjust AI difficulty based on player win streak
+          this.player2.aiDifficulty = Math.min(this.p1WinStreak, AI_DIFFICULTY.length - 1);
         }
       }
     }
@@ -1311,6 +1344,11 @@
       this.gameOverTimer = 0;
       this.player1.spawn();
       this.player2.spawn();
+    }
+
+    getDifficultyLabel() {
+      const labels = ['EASY', 'MEDIUM', 'HARD', 'EXPERT'];
+      return labels[Math.min(this.player2.aiDifficulty, labels.length - 1)];
     }
 
     togglePause() {

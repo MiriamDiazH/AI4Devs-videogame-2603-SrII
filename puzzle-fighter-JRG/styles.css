@@ -56,7 +56,8 @@ body {
 .score-label,
 .next-label,
 .wins-label,
-.drop-count-label {
+.drop-count-label,
+.difficulty-label {
   font-size: 10px;
   color: #7f8c8d;
   letter-spacing: 1px;
@@ -70,6 +71,13 @@ body {
   font-size: 20px;
   font-weight: bold;
   color: #ecf0f1;
+}
+
+.difficulty-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2ecc71;
+  letter-spacing: 1px;
 }
 
 canvas {
