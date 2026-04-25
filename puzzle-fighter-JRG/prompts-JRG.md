@@ -57,4 +57,4 @@ READY.wav is not being heard at the beginning
 Using ChatGPT, providing the previous title image I asked for another one with the same style:
 - I want another image with the same style with the text "Puzzle Fighter - JRG"
 
-![Fina-version](image-3.png)
+![Final-version](image-3.png)
