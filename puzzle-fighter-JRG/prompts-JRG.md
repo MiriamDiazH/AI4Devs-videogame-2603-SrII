@@ -1,6 +1,7 @@
 # Puzzle Fighter - JRG
 ## Description
 
+
 ## Prompts
 ### First Functional Design - MVP
 As a video game design expert, I would like you to create a game similar to Super Puzzle Fighter II using HTML, CSS, and JavaScript. Once you have reviewed the game, please outline the incremental development phases along with the expected deliverables for each stage.
@@ -28,3 +29,8 @@ Add better visual assets (sprites) for the videogame using this the resources in
 - Add explosions efects when a gem Crash Gems destroy all connected same-color.
 
 ![Adding-Sprites](image-1.png)
+
+#### Improving Header
+I did a manual fix no prompt needed for this.
+
+![Adding-Sprites](image-2.png)
