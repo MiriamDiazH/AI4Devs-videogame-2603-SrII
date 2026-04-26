@@ -20,7 +20,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
 
     this.setCollideWorldBounds(true);
-    this.body.setSize(30, 30).setOffset(35, 35);
+    // Body matches the Soldier character region in the 100x100 frame: x 35-65 (width 30 at offset 35),
+    // y 34-56 (height 22 ending at the feet line). offsetY + height = 56 = lowest opaque pixel.
+    this.body.setSize(30, 22).setOffset(35, 34);
 
     this.keys = scene.input.keyboard.addKeys({
       left: Phaser.Input.Keyboard.KeyCodes.LEFT,

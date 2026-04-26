@@ -30,7 +30,8 @@ export const ANIM_FRAMERATE_ENEMY_ATTACK = 12;
 export const ANIM_FRAMERATE_ENEMY_HURT = 12;
 export const ANIM_FRAMERATE_ENEMY_DEATH = 8;
 
-const DEFAULT_HITBOX = { width: 30, height: 40, offsetX: 35, offsetY: 30 };
+// offsetY + height = 56 = feet line (lowest opaque pixel) in the 100x100 Orc frame.
+const DEFAULT_HITBOX = { width: 30, height: 22, offsetX: 35, offsetY: 34 };
 
 export const ENEMY_VARIANTS = {
   grunt: {
