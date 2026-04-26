@@ -1,6 +1,7 @@
 import { GAME_WIDTH, GAME_HEIGHT, GROUND_HEIGHT, LEVEL_WIDTH_SCREENS } from '../config.js';
 import { Player } from '../entities/Player.js';
 import { createBulletPool } from '../entities/Bullet.js';
+import { EnemySpawner } from '../entities/EnemySpawner.js';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -12,12 +13,10 @@ export class GameScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor('#7ec0ee');
 
-    // Ground visual: tile the full grass tileset image horizontally; the visible top GROUND_HEIGHT pixels show.
     this.add
       .tileSprite(0, GAME_HEIGHT - GROUND_HEIGHT, levelWidth, GROUND_HEIGHT, 'grass-tileset')
       .setOrigin(0, 0);
 
-    // Invisible static body for collision, sized to match the visual ground strip.
     this.groundBody = this.add
       .rectangle(0, GAME_HEIGHT - GROUND_HEIGHT, levelWidth, GROUND_HEIGHT)
       .setOrigin(0, 0)
@@ -34,6 +33,18 @@ export class GameScene extends Phaser.Scene {
 
     this.player = new Player(this, 80, GAME_HEIGHT - GROUND_HEIGHT - 100);
     this.physics.add.collider(this.player, this.groundBody);
+
+    this.enemies = this.physics.add.group();
+    this.physics.add.collider(this.enemies, this.groundBody);
+    this.physics.add.collider(this.player, this.enemies);
+
+    this.physics.add.overlap(this.bullets, this.enemies, (bullet, enemy) => {
+      if (!bullet.friendly) return;
+      bullet.disableBody(true, true);
+      enemy.takeDamage(1);
+    });
+
+    this.spawner = new EnemySpawner(this, this.enemies);
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0);
   }

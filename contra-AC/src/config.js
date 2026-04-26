@@ -19,3 +19,45 @@ export const BULLET_POOL_MAX_SIZE = 32;
 export const BULLET_SCALE = 1;
 export const BULLET_OFFSCREEN_MARGIN = 64;
 export const ANIM_FRAMERATE_ATTACK = 16;
+
+export const ENEMY_MAX_ON_SCREEN = 5;
+export const ENEMY_SPAWN_INTERVAL_MS = 1500;
+export const ENEMY_SPAWN_MARGIN = 64;
+
+export const ANIM_FRAMERATE_ENEMY_IDLE = 6;
+export const ANIM_FRAMERATE_ENEMY_WALK = 10;
+export const ANIM_FRAMERATE_ENEMY_ATTACK = 12;
+export const ANIM_FRAMERATE_ENEMY_HURT = 12;
+export const ANIM_FRAMERATE_ENEMY_DEATH = 8;
+
+const DEFAULT_HITBOX = { width: 30, height: 40, offsetX: 35, offsetY: 30 };
+
+export const ENEMY_VARIANTS = {
+  grunt: {
+    tint: 0xddddff,
+    scale: 1.0,
+    hp: 1,
+    speed: 80,
+    behaviorId: 'walkToward',
+    hitbox: DEFAULT_HITBOX,
+  },
+  shooter: {
+    tint: 0xff7777,
+    scale: 1.1,
+    hp: 2,
+    speed: 0,
+    behaviorId: 'standAndShoot',
+    fireIntervalMs: 1500,
+    hitbox: DEFAULT_HITBOX,
+  },
+  jumper: {
+    tint: 0xffdd44,
+    scale: 0.9,
+    hp: 1,
+    speed: 100,
+    behaviorId: 'hopToward',
+    jumpIntervalMs: 800,
+    jumpVelocity: 350,
+    hitbox: DEFAULT_HITBOX,
+  },
+};
