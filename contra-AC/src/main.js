@@ -1,0 +1,34 @@
+import { GAME_WIDTH, GAME_HEIGHT, GRAVITY } from './config.js';
+import { BootScene } from './scenes/BootScene.js';
+import { TitleScene } from './scenes/TitleScene.js';
+import { GameScene } from './scenes/GameScene.js';
+import { GameOverScene } from './scenes/GameOverScene.js';
+import { VictoryScene } from './scenes/VictoryScene.js';
+import { PauseScene } from './scenes/PauseScene.js';
+import { toggleMute } from './audio.js';
+
+new Phaser.Game({
+  type: Phaser.AUTO,
+  width: GAME_WIDTH,
+  height: GAME_HEIGHT,
+  backgroundColor: '#000',
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: GRAVITY },
+      debug: false,
+    },
+  },
+  scene: [BootScene, TitleScene, GameScene, GameOverScene, VictoryScene, PauseScene],
+});
+
+// Global mute toggle on M (works on every scene; in-session only).
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'm' || e.key === 'M') {
+    toggleMute();
+  }
+});
