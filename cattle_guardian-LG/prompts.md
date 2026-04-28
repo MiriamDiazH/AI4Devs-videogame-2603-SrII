@@ -1,3 +1,5 @@
+# First prompt:
+
 Develop a complete JavaScript game called Cattle Guardian (inside cattle_guardian-LG folder) that runs in a web browser. No external libraries, just pure JavaScript and modern HTML5 browser apis. Place everything in a single HTML file, referencing a separate JavaScript and CSS file for simplicity. Here are the detailed requirements and structure for the game:  
 
 1 **Game overview** 
@@ -37,3 +39,26 @@ All the sheep are saved only after the last sheep crosses the dotted line of the
 - Use a dark background to enhance the neon effect.
 - Use simple geometric shapes to represent the game elements, such as circles for sheep and X shapes for wolves, and a plus symbol for the shepherd.
 - Show the score counter prominently on the screen.
+
+
+# Second prompt: 
+
+I had this error in chome console: 
+![alt](./images/error-prompt2.png)
+
+
+# Third prompt:
+Some changes to correct:
+
+1. The sheep should be a finite number and must move along the left side, but now from top to bottom and reappear from bottom to top.
+2. The wolves cannot cross to the right of the dashed line that marks the barn's boundary, because they would be inside the barn.
+
+
+Also, to make the game more entertaining:
+
+1. The obstacles last 5 seconds and the sheep can cross them.
+2. If the shepherd touches a sheep on its left side, it gives it a horizontal boost of 2x speed towards the barn.
+3. If a wolf touches an obstacle, it freezes for 15 seconds and then starts moving slowly for the first 5 seconds.
+
+
+

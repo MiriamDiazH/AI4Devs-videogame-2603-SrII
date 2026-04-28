@@ -19,6 +19,10 @@
   const NUM_WOLVES        = 3;
   const BARN_X_RATIO      = 0.82; // barn line at 82 % of width
   const COLLISION_DIST    = 16;
+  const OBSTACLE_LIFESPAN = 5000;  // ms — obstacles expire after 5 s
+  const WOLF_FREEZE_TIME  = 15000; // ms — wolf frozen after hitting obstacle
+  const WOLF_SLOW_TIME    = 5000;  // ms — wolf moves slowly after unfreeze
+  const WOLF_SLOW_FACTOR  = 0.3;   // speed multiplier during slow phase
 
   // Neon palette
   const COL_SHEPHERD = "#39ff14";
@@ -124,10 +128,12 @@
     for (let i = 0; i < count; i++) {
       const angle = Math.random() < 0.5 ? Math.PI / 4 : -Math.PI / 4;
       arr.push({
-        x: W * 0.6 + Math.random() * (W * 0.25),
+        x: W * 0.6 + Math.random() * (W * 0.15),
         y: 40 + Math.random() * (H - 80),
         angle,
         stepCount: 0,
+        frozenUntil: 0,  // timestamp when freeze ends
+        slowUntil: 0,    // timestamp when slow phase ends
       });
     }
     return arr;
@@ -171,7 +177,11 @@
       sfx.obstacle();
     } else {
       // Second click — complete the obstacle from anchor to shepherd's current position
-      obstacles.push({ x1: obstacleStart.x, y1: obstacleStart.y, x2: shepherd.x, y2: shepherd.y });
+      obstacles.push({
+        x1: obstacleStart.x, y1: obstacleStart.y,
+        x2: shepherd.x, y2: shepherd.y,
+        createdAt: performance.now(),
+      });
       obstacleStart = null;
       sfx.obstacle();
     }
@@ -254,22 +264,34 @@
       shepherd.y = Math.max(SHEPHERD_SIZE, Math.min(H - SHEPHERD_SIZE, shepherd.y));
     }
 
-    // ── Sheep movement (downward + push) ──
+    // ── Expire old obstacles ──
+    const now = performance.now();
+    obstacles = obstacles.filter((o) => now - o.createdAt < OBSTACLE_LIFESPAN);
+
+    // ── Sheep movement (top → bottom, wrap to top) ──
     for (const s of sheep) {
       if (s.saved) continue;
       // Move downward
       s.y += SHEEP_SPEED;
 
-      // Wrap vertically
+      // Wrap: reappear at top when going past bottom
       if (s.y > H + SHEEP_RADIUS) s.y = -SHEEP_RADIUS;
 
-      // Shepherd pushes sheep horizontally on contact
-      const d = dist(shepherd.x, shepherd.y, s.x, s.y);
-      if (d < SHEPHERD_SIZE + SHEEP_RADIUS) {
-        const pushDir = s.x >= shepherd.x ? 1 : -1;
-        s.x += pushDir * SHEPHERD_SPEED * 1.2;
-        s.x = Math.max(SHEEP_RADIUS, Math.min(W - SHEEP_RADIUS, s.x));
+      // Apply horizontal boost momentum (decays each frame)
+      if (s.boostVx) {
+        s.x += s.boostVx;
+        s.boostVx *= 0.94; // friction decay
+        if (Math.abs(s.boostVx) < 0.1) s.boostVx = 0;
       }
+
+      // Shepherd pushes sheep — only when touching from the LEFT side
+      const d = dist(shepherd.x, shepherd.y, s.x, s.y);
+      if (d < SHEPHERD_SIZE + SHEEP_RADIUS && shepherd.x < s.x) {
+        // 2× horizontal boost toward the barn (right)
+        s.boostVx = BASE_SPEED * 2;
+      }
+
+      s.x = Math.max(SHEEP_RADIUS, Math.min(W - SHEEP_RADIUS, s.x));
 
       // Check if sheep crosses barn line
       if (s.x >= barnX) {
@@ -282,26 +304,40 @@
 
     // ── Wolves movement (45° angles, change after N steps) ──
     for (const w of wolves) {
-      const vx = Math.cos(w.angle) * WOLF_SPEED;
-      const vy = Math.sin(w.angle) * WOLF_SPEED;
+      // Frozen wolf — skip movement
+      if (w.frozenUntil > now) continue;
+
+      // Determine current speed (slow phase after freeze)
+      let curSpeed = WOLF_SPEED;
+      if (w.slowUntil > now) curSpeed = WOLF_SPEED * WOLF_SLOW_FACTOR;
+
+      const vx = Math.cos(w.angle) * curSpeed;
+      const vy = Math.sin(w.angle) * curSpeed;
       let nx = w.x + vx;
       let ny = w.y + vy;
 
-      // Bounce off walls
-      if (nx < WOLF_SIZE || nx > W - WOLF_SIZE) {
+      // Wolves cannot cross barn line (right boundary)
+      if (nx > barnX - WOLF_SIZE) {
         w.angle = Math.PI - w.angle;
-        nx = w.x + Math.cos(w.angle) * WOLF_SPEED;
+        nx = w.x + Math.cos(w.angle) * curSpeed;
+      }
+
+      // Bounce off walls (left, top, bottom)
+      if (nx < WOLF_SIZE) {
+        w.angle = Math.PI - w.angle;
+        nx = w.x + Math.cos(w.angle) * curSpeed;
       }
       if (ny < WOLF_SIZE || ny > H - WOLF_SIZE) {
         w.angle = -w.angle;
-        ny = w.y + Math.sin(w.angle) * WOLF_SPEED;
+        ny = w.y + Math.sin(w.angle) * curSpeed;
       }
 
-      // Obstacle collision — reverse
+      // Obstacle collision — freeze wolf
       if (blockedByObstacle(w.x, w.y, nx, ny)) {
-        w.angle += Math.PI; // bounce back
-        nx = w.x + Math.cos(w.angle) * WOLF_SPEED;
-        ny = w.y + Math.sin(w.angle) * WOLF_SPEED;
+        w.frozenUntil = now + WOLF_FREEZE_TIME;
+        w.slowUntil   = now + WOLF_FREEZE_TIME + WOLF_SLOW_TIME;
+        w.angle += Math.PI; // face away
+        continue; // don't move this frame
       }
 
       w.x = nx;
@@ -311,9 +347,7 @@
       // Change direction after WOLF_MOVE_STEPS
       if (w.stepCount >= WOLF_MOVE_STEPS) {
         w.stepCount = 0;
-        // Switch between 45° and 135° (or their negatives)
         if (Math.abs(Math.cos(w.angle)) > 0.5) {
-          // Currently ~45° family → flip horizontal component
           w.angle = Math.PI - w.angle;
         } else {
           w.angle = -w.angle;
@@ -404,11 +438,16 @@
     noGlow();
     ctx.restore();
 
-    // ── Obstacles ──
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = COL_OBSTACLE;
-    glow(COL_OBSTACLE, 10);
+    // ── Obstacles (with fade-out) ──
+    ctx.lineCap = "round";
+    const drawNow = performance.now();
     for (const o of obstacles) {
+      const age = drawNow - o.createdAt;
+      const remaining = OBSTACLE_LIFESPAN - age;
+      const alpha = remaining < 1500 ? remaining / 1500 : 1; // fade last 1.5 s
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = `rgba(255, 153, 0, ${alpha})`;
+      glow(COL_OBSTACLE, 10 * alpha);
       ctx.beginPath();
       ctx.moveTo(o.x1, o.y1);
       ctx.lineTo(o.x2, o.y2);
@@ -444,10 +483,15 @@
 
     // ── Wolves (X shapes) ──
     ctx.lineWidth = 3;
-    ctx.strokeStyle = COL_WOLF;
     ctx.lineCap = "round";
-    glow(COL_WOLF, 14);
+    const wNow = performance.now();
     for (const w of wolves) {
+      const isFrozen = w.frozenUntil > wNow;
+      const isSlow   = !isFrozen && w.slowUntil > wNow;
+      // Frozen = cyan/blue tint, slow = dimmer red
+      const wColor = isFrozen ? "#44ccff" : isSlow ? "#aa1833" : COL_WOLF;
+      ctx.strokeStyle = wColor;
+      glow(wColor, isFrozen ? 18 : 14);
       const s = WOLF_SIZE;
       ctx.beginPath();
       ctx.moveTo(w.x - s, w.y - s);
@@ -455,6 +499,13 @@
       ctx.moveTo(w.x + s, w.y - s);
       ctx.lineTo(w.x - s, w.y + s);
       ctx.stroke();
+      // Frozen indicator: ring around wolf
+      if (isFrozen) {
+        ctx.beginPath();
+        ctx.arc(w.x, w.y, WOLF_SIZE + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(68, 204, 255, 0.5)";
+        ctx.stroke();
+      }
     }
     noGlow();
 
