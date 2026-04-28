@@ -1,4 +1,11 @@
-# First prompt:
+# Tools 
+**IDE**: VSCode with Github Copilot
+
+**Model**: Claude Opus 4.6 
+
+
+# Prompts for Cattle Guardian game development
+## First prompt:
 
 Develop a complete JavaScript game called Cattle Guardian (inside cattle_guardian-LG folder) that runs in a web browser. No external libraries, just pure JavaScript and modern HTML5 browser apis. Place everything in a single HTML file, referencing a separate JavaScript and CSS file for simplicity. Here are the detailed requirements and structure for the game:  
 
@@ -41,13 +48,13 @@ All the sheep are saved only after the last sheep crosses the dotted line of the
 - Show the score counter prominently on the screen.
 
 
-# Second prompt: 
+## Second prompt: 
 
 I had this error in chome console: 
 ![alt](./images/error-prompt2.png)
 
 
-# Third prompt:
+## Third prompt:
 Some changes to correct:
 
 1. The sheep should be a finite number and must move along the left side, but now from top to bottom and reappear from bottom to top.
@@ -61,4 +68,22 @@ Also, to make the game more entertaining:
 3. If a wolf touches an obstacle, it freezes for 15 seconds and then starts moving slowly for the first 5 seconds.
 
 
+## Fourth prompt:
+
+I tested it and everything you asked for is OK except for these points:
+
+The sheep keep falling from top to bottom. I made it clear that they should reappear from bottom to top and be a finite number: let's say 20 sheep.
+
+I told you that when the shepherd touches a sheep on the left, it should gain a lot of momentum and follow a horizontal trajectory from left to right at high speed until it enters the barn. Once it crosses the line, it should stop and stay inside the barn. The score should then register as a saved sheep.
+
+If a wolf intercepts a sheep, it's not game over yet. It's only game over if the wolves manage to capture 40% of the sheep.
+
+Make these changes one at a time and don't mark anything as solved until I give you my final confirmation.
+
+## Fifth prompt:
+
+ No, the sheep do have to reappear. Once the last sheep crosses the upper boundary of the canvas, or vice versa, they all reappear in the opposite direction, like a bounce. Correct that, please.
+
+## Sixth - Eighth prompt: 
+It' s OK. Let's move forward with the next change. But remember, you have to wait for my confirmation that everything is OK before I mark it as resolved.
 

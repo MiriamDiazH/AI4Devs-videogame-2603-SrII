@@ -15,7 +15,7 @@
   const WOLF_SIZE      = 14;
 
   const WOLF_MOVE_STEPS   = 180; // frames between direction changes (~3 s)
-  const NUM_SHEEP         = 5;
+  const NUM_SHEEP         = 20;
   const NUM_WOLVES        = 3;
   const BARN_X_RATIO      = 0.82; // barn line at 82 % of width
   const COLLISION_DIST    = 16;
@@ -87,6 +87,7 @@
   let score = 0;
   let running = false;
   let gameWon = false;
+  let sheepDir = -1; // -1 = moving up, +1 = moving down
   let keys = {};
   let obstacleStart = null; // {x,y} or null — first click recorded
 
@@ -116,8 +117,13 @@
     for (let i = 0; i < count; i++) {
       arr.push({
         x: 40 + Math.random() * (W * 0.25),
-        y: 30 + Math.random() * (H - 60),
+        y: H + SHEEP_RADIUS + Math.random() * H, // spawn below canvas, staggered
         saved: false,
+        captured: false,
+        offscreen: false, // true when past the current edge
+        launched: false,  // true when pushed toward barn
+        launchSpeed: 0,
+        boostVx: 0,
       });
     }
     return arr;
@@ -152,6 +158,7 @@
     score    = 0;
     running  = true;
     gameWon  = false;
+    sheepDir = -1; // start moving upward
     hud.textContent = "Sheep Saved: 0";
     overlay.classList.add("hidden");
   }
@@ -268,37 +275,66 @@
     const now = performance.now();
     obstacles = obstacles.filter((o) => now - o.createdAt < OBSTACLE_LIFESPAN);
 
-    // ── Sheep movement (top → bottom, wrap to top) ──
+    // ── Sheep movement (bounce: up↔down) ──
+    let allOffscreen = true;
     for (const s of sheep) {
-      if (s.saved) continue;
-      // Move downward
-      s.y += SHEEP_SPEED;
+      if (s.saved || s.captured) continue;
 
-      // Wrap: reappear at top when going past bottom
-      if (s.y > H + SHEEP_RADIUS) s.y = -SHEEP_RADIUS;
-
-      // Apply horizontal boost momentum (decays each frame)
-      if (s.boostVx) {
-        s.x += s.boostVx;
-        s.boostVx *= 0.94; // friction decay
-        if (Math.abs(s.boostVx) < 0.1) s.boostVx = 0;
+      // ── Launched sheep: horizontal trajectory only ──
+      if (s.launched) {
+        s.x += s.launchSpeed;
+        // Crossed barn line → saved, stop inside barn
+        if (s.x >= barnX) {
+          s.x = barnX + SHEEP_RADIUS + 5; // rest inside barn
+          s.saved = true;
+          s.launched = false;
+          score++;
+          hud.textContent = `Sheep Saved: ${score}`;
+          sfx.saved();
+        }
+        continue; // skip normal vertical movement
       }
 
-      // Shepherd pushes sheep — only when touching from the LEFT side
+      // Move in current direction
+      s.y += SHEEP_SPEED * sheepDir;
+
+      // Check if past edge
+      if (sheepDir === -1 && s.y < -SHEEP_RADIUS) {
+        s.offscreen = true;
+      } else if (sheepDir === 1 && s.y > H + SHEEP_RADIUS) {
+        s.offscreen = true;
+      } else {
+        s.offscreen = false;
+        allOffscreen = false;
+      }
+
+      if (s.offscreen) continue;
+
+      // Shepherd touches sheep from the LEFT → launch horizontally toward barn
       const d = dist(shepherd.x, shepherd.y, s.x, s.y);
       if (d < SHEPHERD_SIZE + SHEEP_RADIUS && shepherd.x < s.x) {
-        // 2× horizontal boost toward the barn (right)
-        s.boostVx = BASE_SPEED * 2;
+        s.launched = true;
+        s.launchSpeed = BASE_SPEED * 4; // fast horizontal speed
       }
 
       s.x = Math.max(SHEEP_RADIUS, Math.min(W - SHEEP_RADIUS, s.x));
+    }
 
-      // Check if sheep crosses barn line
-      if (s.x >= barnX) {
-        s.saved = true;
-        score++;
-        hud.textContent = `Sheep Saved: ${score}`;
-        sfx.saved();
+    // Bounce: when ALL active sheep are offscreen, flip direction & respawn
+    const activeSheep = sheep.filter((s) => !s.saved && !s.captured);
+    if (activeSheep.length > 0 && activeSheep.every((s) => s.offscreen)) {
+      sheepDir *= -1; // flip direction
+      for (const s of activeSheep) {
+        s.offscreen = false;
+        // Place them at the opposite edge, staggered
+        if (sheepDir === -1) {
+          // Now moving up → spawn at bottom
+          s.y = H + SHEEP_RADIUS + Math.random() * (H * 0.5);
+        } else {
+          // Now moving down → spawn at top
+          s.y = -SHEEP_RADIUS - Math.random() * (H * 0.5);
+        }
+        s.x = 40 + Math.random() * (W * 0.25); // reset horizontal position on left side
       }
     }
 
@@ -356,23 +392,37 @@
     }
 
     // ── Collision: wolf ↔ sheep ──
+    let capturedCount = 0;
     for (const w of wolves) {
+      // Frozen wolves don't capture
+      if (w.frozenUntil > now) continue;
+
       for (const s of sheep) {
-        if (s.saved) continue;
+        if (s.saved || s.captured || s.offscreen) continue;
         if (dist(w.x, w.y, s.x, s.y) < WOLF_SIZE + SHEEP_RADIUS) {
-          endGame(false);
-          return;
+          s.captured = true;
         }
       }
-      // wolf ↔ shepherd
+      // wolf ↔ shepherd → game over
       if (dist(w.x, w.y, shepherd.x, shepherd.y) < WOLF_SIZE + SHEPHERD_SIZE * 0.6) {
         endGame(false);
         return;
       }
     }
 
-    // ── Win condition: all sheep saved ──
-    if (sheep.every((s) => s.saved)) {
+    // Count total captured sheep
+    capturedCount = sheep.filter((s) => s.captured).length;
+    hud.textContent = `Sheep Saved: ${score} | Captured: ${capturedCount}/${NUM_SHEEP}`;
+
+    // ── Game over if 40 % captured ──
+    if (capturedCount >= Math.ceil(NUM_SHEEP * 0.4)) {
+      endGame(false);
+      return;
+    }
+
+    // ── Win condition: all non-captured sheep saved ──
+    const remaining = sheep.filter((s) => !s.captured);
+    if (remaining.length > 0 && remaining.every((s) => s.saved)) {
       endGame(true);
     }
   }
@@ -389,8 +439,9 @@
       oMsg.innerHTML = `All sheep are safe!<br>Score: ${score}`;
     } else {
       sfx.gameOver();
+      const captured = sheep.filter((s) => s.captured).length;
       oTitle.textContent = "Game Over";
-      oMsg.innerHTML = `A wolf got through!<br>Sheep saved: ${score}`;
+      oMsg.innerHTML = `Wolves captured ${captured} sheep (40% limit reached)!<br>Sheep saved: ${score}`;
     }
     startBtn.textContent = "Play Again";
     overlay.classList.remove("hidden");
@@ -466,7 +517,7 @@
 
     // ── Sheep (circles) ──
     for (const s of sheep) {
-      if (s.saved) continue;
+      if (s.saved || s.captured || s.offscreen) continue;
       ctx.beginPath();
       ctx.arc(s.x, s.y, SHEEP_RADIUS, 0, Math.PI * 2);
       ctx.fillStyle = COL_SHEEP;
