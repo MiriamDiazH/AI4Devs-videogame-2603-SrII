@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Debug Runner</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="hud">
+        <span id="score-display">SCORE: <span id="score">0</span></span>
+        <span id="title-text">DEBUG RUNNER</span>
+        <span id="speed-display">SPEED: <span id="speed">1.0</span>x</span>
+      </header>
+
+      <main id="game-wrapper">
+        <canvas id="game-canvas"></canvas>
+
+        <div id="overlay" class="visible">
+          <div id="overlay-content">
+            <pre id="overlay-art">
+ ____       _                  ____
+|  _ \  ___| |__  _   _  __ _|  _ \ _   _ _ __  _ __   ___ _ __
+| | | |/ _ \ '_ \| | | |/ _` | |_) | | | | '_ \| '_ \ / _ \ '__|
+| |_| |  __/ |_) | |_| | (_| |  _ &lt;| |_| | | | | | | |  __/ |
+|____/ \___|_.__/ \__,_|\__, |_| \_\\__,_|_| |_|_| |_|\___|_|
+                        |___/
+          </pre
+            >
+            <p id="overlay-subtitle">
+              Navigate through the code. Dodge the bugs.
+            </p>
+            <p id="overlay-score-msg" class="hidden">
+              FINAL SCORE: <span id="final-score">0</span>
+            </p>
+            <div id="overlay-controls">
+              <span><kbd>&larr; &rarr;</kbd> Switch lane</span>
+              <span><kbd>SPACE</kbd> / <kbd>&uarr;</kbd> Jump</span>
+              <span class="mobile-hint">Swipe on mobile</span>
+            </div>
+            <div id="name-section" class="hidden">
+              <p id="name-prompt">Enter your name to save your score:</p>
+              <div id="name-row">
+                <input
+                  id="player-name"
+                  type="text"
+                  maxlength="16"
+                  placeholder="Anonymous"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button id="submit-name-btn">[ SAVE ]</button>
+              </div>
+            </div>
+
+            <div id="ranking-section" class="hidden">
+              <div id="ranking-header">
+                <span>TOP 5 — LEADERBOARD</span>
+                <button id="clear-ranking-btn">[ CLEAR ]</button>
+              </div>
+              <table id="ranking-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>NAME</th>
+                    <th>SCORE</th>
+                  </tr>
+                </thead>
+                <tbody id="ranking-body"></tbody>
+              </table>
+            </div>
+
+            <button id="start-btn">[ START ]</button>
+          </div>
+        </div>
+      </main>
+
+      <footer id="footer-bar">
+        <span class="footer-hint"
+          >&#8592; &#8594; Switch Lane &nbsp;|&nbsp; SPACE / &#8593; Jump
+          &nbsp;|&nbsp; Swipe on mobile</span
+        >
+      </footer>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
