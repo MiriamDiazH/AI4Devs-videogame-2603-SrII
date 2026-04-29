@@ -1,0 +1,188 @@
+# combat-shooting Specification
+
+## Purpose
+TBD - created by archiving change phase-3-bullets-and-shooting. Update Purpose after archive.
+## Requirements
+### Requirement: Bullet pool exists and is reused
+
+`GameScene` SHALL maintain a single bullet pool (a Phaser Arcade Physics group with a fixed `maxSize`) defined in `contra-AC/src/entities/Bullet.js`. Firing SHALL recycle dead bullets from the pool rather than allocating new sprites.
+
+#### Scenario: Pool is created on scene start
+
+- **WHEN** `GameScene.create()` runs
+- **THEN** a single bullet pool exists with `maxSize` taken from `config.js`
+- **AND** all members start in the dead state
+
+#### Scenario: Firing recycles dead bullets
+
+- **WHEN** the player fires
+- **THEN** the bullet emitted is a previously-dead member of the pool that is reactivated and repositioned
+- **AND** the pool's total member count does not exceed `maxSize`
+
+### Requirement: Fire input fires bullets at a capped cadence
+
+The player SHALL fire a bullet on `Z`, `X`, or left mouse button while at least `PLAYER_FIRE_COOLDOWN_MS` has elapsed since the last fire. Holding a fire input SHALL produce a steady stream at the cooldown rate.
+
+#### Scenario: Single press fires once
+
+- **WHEN** the player taps `Z`
+- **THEN** exactly one bullet is emitted
+
+#### Scenario: Held input produces a steady stream
+
+- **WHEN** `Z` is held continuously for one second and `PLAYER_FIRE_COOLDOWN_MS` is `200`
+- **THEN** approximately five bullets are emitted (within ±1 due to timing alignment)
+
+#### Scenario: Cooldown gates rapid alternation
+
+- **WHEN** the player presses `Z`, then `X` immediately afterwards within `PLAYER_FIRE_COOLDOWN_MS`
+- **THEN** only one bullet is emitted from the pair
+
+#### Scenario: Mouse click fires equivalently
+
+- **WHEN** the left mouse button is pressed
+- **THEN** a bullet is emitted using the same cooldown rules as keyboard fire
+
+### Requirement: Bullets travel horizontally in the player's facing direction
+
+A fired bullet SHALL spawn at the player's torso position with a horizontal velocity of `+BULLET_SPEED` if the player faces right or `-BULLET_SPEED` if the player faces left. Bullets SHALL NOT be affected by gravity.
+
+#### Scenario: Bullet inherits facing
+
+- **WHEN** the player fires while facing right
+- **THEN** the bullet's velocity is `(+BULLET_SPEED, 0)`
+
+- **WHEN** the player fires while facing left
+- **THEN** the bullet's velocity is `(-BULLET_SPEED, 0)`
+
+#### Scenario: Bullets ignore gravity
+
+- **WHEN** a bullet is in flight
+- **THEN** its vertical velocity remains zero throughout its lifetime
+
+### Requirement: Bullets despawn when off-screen, on ground, or after lifetime
+
+A bullet SHALL return to the pool (deactivate) when any of:
+1. Its position leaves the camera's visible rectangle by more than a small margin.
+2. It collides with the ground.
+3. `BULLET_LIFETIME_MS` has elapsed since the bullet was spawned.
+
+#### Scenario: Bullet leaving camera
+
+- **WHEN** a bullet's x position exceeds the camera's right edge plus margin
+- **THEN** the bullet is returned to the pool (`active = false`, `visible = false`)
+
+#### Scenario: Bullet hitting the ground
+
+- **WHEN** a bullet collides with the level ground
+- **THEN** the bullet is returned to the pool
+
+#### Scenario: Bullet exceeding lifetime
+
+- **WHEN** a bullet has been alive for `BULLET_LIFETIME_MS` without otherwise despawning
+- **THEN** the bullet is returned to the pool
+
+### Requirement: Attack animation plays on fire
+
+On every successful fire, the Soldier SHALL play the `soldier-attack` animation once and then return to the movement-appropriate animation (walk if moving, idle otherwise).
+
+#### Scenario: Attack animation triggers and resolves
+
+- **WHEN** a bullet is fired
+- **THEN** the player's active animation becomes `soldier-attack`
+- **AND** when the attack animation completes the active animation is `soldier-walk` (if moving) or `soldier-idle` (if stationary)
+
+### Requirement: Placeholder shoot SFX plays on fire
+
+A short audio cue SHALL play on each successful fire. The asset MAY be a synthesized placeholder in this phase; it is replaced with a real asset in Phase 8.
+
+#### Scenario: Each fire plays one cue
+
+- **WHEN** a bullet is emitted
+- **THEN** exactly one shoot-SFX trigger occurs
+
+### Requirement: Combat tuning constants live in `config.js`
+
+`src/config.js` SHALL export `PLAYER_FIRE_COOLDOWN_MS`, `BULLET_SPEED`, `BULLET_LIFETIME_MS`, `BULLET_POOL_MAX_SIZE`, and `BULLET_SCALE` as named constants. No fire-related numeric value SHALL be hard-coded inside `Player.js`, `Bullet.js`, or `GameScene.js`.
+
+#### Scenario: Constants exist with the expected names
+
+- **WHEN** `config.js` is imported
+- **THEN** the constants above resolve to numeric values
+
+#### Scenario: No magic numbers in combat code
+
+- **WHEN** `Player.js`, `Bullet.js`, and `GameScene.js` are searched for the literal values of those constants
+- **THEN** they appear only as imports from `config.js`
+
+### Requirement: Bullet pool supports a `friendly` flag
+
+`Bullet.fire()` SHALL accept a boolean `friendly` parameter. The pool SHALL allow both player-origin (`friendly: true`) and enemy-origin (`friendly: false`) bullets to coexist as members of the same group.
+
+#### Scenario: Friendly flag is set on fire
+
+- **WHEN** the player fires
+- **THEN** the emitted bullet's `friendly` is `true`
+
+- **WHEN** a shooter enemy fires
+- **THEN** the emitted bullet's `friendly` is `false`
+
+#### Scenario: Tint reflects friendliness
+
+- **WHEN** a bullet is rendered with `friendly: true`
+- **THEN** its tint corresponds to the player-bullet color
+
+- **WHEN** a bullet is rendered with `friendly: false`
+- **THEN** its tint corresponds to the enemy-bullet color
+
+### Requirement: Player bullets target enemies via overlap
+
+`GameScene` SHALL register a `physics.add.overlap` between the bullet pool (filtered to friendly bullets) and the enemy group. Friendly bullets that overlap an enemy SHALL despawn on impact.
+
+#### Scenario: Friendly bullet hits enemy
+
+- **WHEN** a friendly bullet overlaps an active enemy
+- **THEN** the bullet returns to the pool (active and visible become false)
+- **AND** the enemy's hurt logic runs (HP decrement and hurt animation)
+
+#### Scenario: Enemy bullets do not damage other enemies
+
+- **WHEN** an enemy bullet overlaps another enemy
+- **THEN** neither the enemy nor the bullet is affected
+
+### Requirement: Recycled bullets fire identically to fresh ones
+
+When `Bullet.fire(x, y, dirX, friendly)` is invoked on a sprite that was previously despawned via `disableBody(true, true)`, the bullet SHALL move at the configured `BULLET_SPEED` exactly as a freshly-constructed bullet would. Recycled bullets SHALL NOT remain stationary at the spawn position.
+
+#### Scenario: First fire after recycle moves at full speed
+
+- **WHEN** a bullet has been despawned (via lifetime, off-screen, or collision)
+- **AND** the pool returns that same instance to a subsequent `pool.get()` call
+- **AND** `fire(x, y, dirX, friendly)` is invoked on it
+- **THEN** the bullet's body has `enable === true`
+- **AND** within 100 ms the bullet has moved by approximately `BULLET_SPEED * 0.1` pixels in the `dirX` direction
+
+#### Scenario: Many sequential fires all move
+
+- **WHEN** the player fires 12 bullets in succession with each preceding bullet despawned before the next fire
+- **THEN** every one of the 12 bullets travels horizontally at `BULLET_SPEED`
+- **AND** none of them remain stuck at the spawn position
+
+### Requirement: Bullet-vs-ground collider despawns the bullet without throwing
+
+When any bullet's body overlaps the level ground body, the collider callback SHALL invoke `disableBody(true, true)` on the bullet (not on the ground), and SHALL NOT throw `TypeError: ...is not a function`.
+
+#### Scenario: Player bullet near ground level despawns cleanly
+
+- **WHEN** the player fires a bullet whose body Y range overlaps the ground body Y range
+- **THEN** the bullet's `body.enable` becomes `false`
+- **AND** the bullet's `active` becomes `false`
+- **AND** no uncaught error is thrown to the console
+
+#### Scenario: Enemy bullet near ground level despawns cleanly
+
+- **WHEN** a shooter enemy fires a bullet whose body Y range overlaps the ground body Y range
+- **THEN** the bullet's `body.enable` becomes `false`
+- **AND** the bullet's `active` becomes `false`
+- **AND** no uncaught error is thrown to the console
+
