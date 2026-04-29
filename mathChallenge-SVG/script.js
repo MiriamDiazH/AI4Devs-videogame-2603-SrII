@@ -42,7 +42,11 @@ function randomInt(min, max) {
 }
 
 function loadHighScore() {
-  return Number(localStorage.getItem(HIGH_SCORE_KEY)) || 0;
+  try {
+    return Number(localStorage.getItem(HIGH_SCORE_KEY)) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 function loadLeaderboard() {
@@ -64,13 +68,35 @@ function normalizePlayerName(name) {
 function saveHighScore() {
   if (state.playerScore > state.highScore) {
     state.highScore = state.playerScore;
-    localStorage.setItem(HIGH_SCORE_KEY, String(state.highScore));
+
+    try {
+      localStorage.setItem(HIGH_SCORE_KEY, String(state.highScore));
+    } catch {
+      return false;
+    }
   }
+
+  return true;
 }
 
 function saveLeaderboardEntry() {
+  let storedLeaderboard = state.leaderboard;
+
+  try {
+    const savedScores = JSON.parse(localStorage.getItem(LEADERBOARD_KEY)) || [];
+
+    if (Array.isArray(savedScores)) {
+      storedLeaderboard = savedScores
+        .filter((entry) => entry.name && Number.isFinite(entry.score))
+        .sort((first, second) => second.score - first.score)
+        .slice(0, 3);
+    }
+  } catch {
+    storedLeaderboard = state.leaderboard;
+  }
+
   const nextLeaderboard = [
-    ...state.leaderboard,
+    ...storedLeaderboard,
     {
       name: state.playerName || "YOU",
       score: state.playerScore
@@ -81,8 +107,15 @@ function saveLeaderboardEntry() {
     .sort((first, second) => second.score - first.score)
     .slice(0, 3);
 
-  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(state.leaderboard));
+  try {
+    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(state.leaderboard));
+  } catch {
+    renderLeaderboard();
+    return false;
+  }
+
   renderLeaderboard();
+  return true;
 }
 
 function renderLeaderboard() {
